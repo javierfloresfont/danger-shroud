@@ -69,7 +69,12 @@ module Danger
       touchedFilesHash = {}
 
       touchedFileNames.each do |touchedFileName|
+
+        warn "JAVILOG: touchedFileName" + touchedFileName.to_s
+
         xmlForFileName = parsedXml.xpath("//class[@sourcefilename='#{touchedFileName}']/counter[@type='INSTRUCTION']")
+
+        warn "JAVILOG: xmlForFileName" + xmlForFileName.to_s
 
         if (xmlForFileName.length > 0)
           missed = 0
