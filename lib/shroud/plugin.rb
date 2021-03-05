@@ -62,35 +62,29 @@ module Danger
       touchedFileNames = @dangerfile.git.modified_files.map { |file| File.basename(file) }
       touchedFileNames += @dangerfile.git.added_files.map { |file| File.basename(file) }
 
-      # used to later report files that were modified but not included in the jacoco report
-      fileNamesNotInJacocoReport = []
-
       # hash for keeping track of coverage per filename: {filename => coverage percent}
+
+      sourcefilenames = parsedXml.xpath("//sourcefile")
+      fsourcefilesnames = sourcefilenames.reduce([]) do |acc, sourcefile|  
+        acc.append(sourcefile) if touchedFileNames.include? sourcefile.attr('name')
+        acc 
+      end
       touchedFilesHash = {}
-
-      touchedFileNames.each do |touchedFileName|
-
-        warn "JAVILOG: touchedFileName" + touchedFileName.to_s
-
-        xmlForFileName = parsedXml.xpath("//class[@sourcefilename='#{touchedFileName}']/counter[@type='INSTRUCTION']")
-
-        warn "JAVILOG: xmlForFileName" + xmlForFileName.to_s
-
-        if (xmlForFileName.length > 0)
-          missed = 0
-          covered = 0
-          xmlForFileName.each do |classCountXml|
-            missed += classCountXml.attr("missed").to_i
-            covered += classCountXml.attr("covered").to_i
-          end
-          touchedFilesHash[touchedFileName] = (covered.to_f / (missed + covered)) * 100
-        else
-          fileNamesNotInJacocoReport << touchedFileName
+      fsourcefilesnames.each do |fsourcefilename| 
+        name = fsourcefilename.attributes["name"].value
+        reportValues = fsourcefilename.children.select do |child| 
+          child.name == "counter" && child.attributes["type"].value == "INSTRUCTION" 
+        end
+        if !reportValues.first.nil? 
+          covered = reportValues.first.attributes["covered"].value.to_i
+          missed = reportValues.first.attributes["missed"].value.to_i
+          touchedFilesHash[name] = (covered.to_f / (missed + covered)) * 100
         end
       end
 
-      puts "Here are unreported files"
-      puts fileNamesNotInJacocoReport.to_s
+      # used to later report files that were modified but not included in the jacoco report
+      #fileNamesNotInJacocoReport = touchedFileNames.select { |name| !touchedFilesHash.keys.include?(name) }
+
       puts "Here is the touched files coverage hash"
       puts touchedFilesHash
 
@@ -114,12 +108,9 @@ module Danger
           end
         end
       end
-
-      output << "### Modified Files Not Found In Coverage Report:\n"
-      fileNamesNotInJacocoReport.sort.each do |unreportedFileName| 
-        output << "#{unreportedFileName}\n"
-      end
-
+      
+      #output << "### Modified Files Not Found In Coverage Report:\n"
+      #fileNamesNotInJacocoReport.sort.each { |unreportedFileName| output << "#{unreportedFileName}\n" }
       output << '> Codebase cunningly covered by count [Shroud 🧛](https://github.com/livefront/livefront-shroud-android/)'
       markdown output
 
